@@ -1,5 +1,7 @@
-/* Piso Firme — service worker (offline app shell) */
-const CACHE = "piso-firme-v1";
+/* Piso Firme — service worker.
+   Network-first para el HTML (así los updates llegan siempre),
+   cache-first para los assets. Offline sigue funcionando. */
+const CACHE = "piso-firme-v2";
 const ASSETS = [
   ".",
   "index.html",
@@ -16,27 +18,46 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
+  const req = e.request;
+  if (req.method !== "GET") return;
+
+  const isHTML =
+    req.mode === "navigate" ||
+    req.destination === "document" ||
+    req.url.endsWith("/") ||
+    req.url.endsWith("index.html");
+
+  if (isHTML) {
+    // Network-first: siempre intenta traer la última versión.
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put("index.html", copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match(req).then((hit) => hit || caches.match("index.html")))
+    );
+    return;
+  }
+
+  // Cache-first para el resto (íconos, manifest).
   e.respondWith(
-    caches.match(e.request).then((hit) => {
-      return (
+    caches.match(req).then(
+      (hit) =>
         hit ||
-        fetch(e.request)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-            return res;
-          })
-          .catch(() => caches.match("index.html"))
-      );
-    })
+        fetch(req).then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          return res;
+        })
+    )
   );
 });
