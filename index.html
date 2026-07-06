@@ -452,7 +452,8 @@ function enterPhase(){
   el.set.textContent=`Serie ${curSet()}/${engine.plan.sets}`;
   const col=COLORS[ph.color]||COLORS.orange;
   el.ring.style.stroke=col;
-  el.orb.style.transitionDuration=(ph.anim?Math.max(.25,ph.sec):.3)+"s";
+  const growDur=(ph.anim?Math.max(.25,ph.sec):.3);
+  el.orb.style.transition="transform "+growDur+"s ease, background .3s ease, box-shadow .3s ease";
   el.orb.style.background=`radial-gradient(circle at 35% 30%, rgba(255,255,255,.4), rgba(255,255,255,0) 55%), ${col}`;
   el.orb.style.boxShadow=`0 0 55px ${col}66`;
   requestAnimationFrame(()=>{el.orb.style.transform="scale("+(ph.scale!=null?ph.scale:.6)+")";});
